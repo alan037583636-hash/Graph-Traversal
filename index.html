@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f5f7fb">
+  <title>Graph Traversal Lab | 圖形走訪視覺化</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      background:
+        radial-gradient(ellipse at 12% 0%, rgba(219, 234, 254, .55), transparent 34rem),
+        #f5f7fb;
+    }
+
+    .graph-edge {
+      stroke: #cbd5e1;
+      stroke-width: 3;
+      stroke-linecap: round;
+      transition: stroke .25s ease, stroke-width .25s ease;
+    }
+
+    .graph-node {
+      cursor: default;
+    }
+
+    .node-circle {
+      fill: #fff;
+      stroke: #cbd5e1;
+      stroke-width: 3;
+      transition: fill .25s ease, stroke .25s ease, filter .25s ease;
+    }
+
+    .node-code {
+      fill: #334155;
+      font-size: 17px;
+      font-weight: 750;
+      text-anchor: middle;
+      dominant-baseline: central;
+      pointer-events: none;
+      transition: fill .25s ease;
+    }
+
+    .node-label {
+      fill: #475569;
+      font-size: 13px;
+      font-weight: 650;
+      text-anchor: middle;
+    }
+
+    .node-label-en {
+      fill: #94a3b8;
+      font-size: 10px;
+      text-anchor: middle;
+    }
+
+    .graph-node.discovered .node-circle {
+      fill: #fff7ed;
+      stroke: #f97316;
+    }
+
+    .graph-node.active .node-circle {
+      fill: #f59e0b;
+      stroke: #d97706;
+      filter: drop-shadow(0 5px 10px rgba(245, 158, 11, .3));
+    }
+
+    .graph-node.active .node-code {
+      fill: #fff;
+    }
+
+    .graph-node.finished .node-circle {
+      fill: #f0fdf4;
+      stroke: #22c55e;
+    }
+
+    .graph-node.finished .node-code {
+      fill: #15803d;
+    }
+
+    .status-dot {
+      box-shadow: 0 0 0 3px white;
+    }
+
+    @media (max-width: 640px) {
+      .node-label {
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen text-slate-800 antialiased">
+  <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
+    <header class="mb-7 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <div class="mb-2 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white/80 px-3 py-1 text-xs font-semibold tracking-wide text-blue-700 shadow-sm">
+          <span class="h-2 w-2 rounded-full bg-blue-500"></span>
+          ALGORITHM PLAYGROUND
+        </div>
+        <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">圖形走訪 <span class="text-blue-600">Graph Traversal</span></h1>
+        <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">跟著節點一步步探索城市景點，觀察 BFS 與 DFS 如何運用不同資料結構走訪圖形。</p>
+      </div>
+      <div class="flex items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 shadow-sm sm:self-auto">
+        <span class="status-dot h-2 w-2 rounded-full bg-emerald-400"></span>
+        無向圖 <span class="text-slate-300">·</span> 6 個節點 <span class="text-slate-300">·</span> 9 條邊
+      </div>
+    </header>
+
+    <section aria-label="走訪控制" class="mb-5 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label class="block">
+            <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">演算法</span>
+            <select id="algorithm" class="w-full min-w-52 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
+              <option value="bfs">BFS（佇列）</option>
+              <option value="dfs">DFS（堆疊）</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">起點</span>
+            <select id="start-node" class="w-full min-w-40 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
+              <option value="A">A · 捷運站</option>
+              <option value="B">B · 博物館</option>
+              <option value="C">C · 夜市</option>
+              <option value="D">D · 公園</option>
+              <option value="E">E · 購物中心</option>
+              <option value="F">F · 觀景台</option>
+            </select>
+          </label>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="run-button" type="button" class="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-60">
+            <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M6 4.75a1 1 0 0 1 1.53-.848l8.1 5.25a1 1 0 0 1 0 1.696l-8.1 5.25A1 1 0 0 1 6 15.25V4.75Z"/></svg>
+            套用 / 執行
+          </button>
+          <button id="reset-button" type="button" class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100">
+            <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 7.5A6 6 0 1 1 4 11m.5-3.5V4.75M4.5 7.5h2.75"/></svg>
+            重設
+          </button>
+        </div>
+      </div>
+      <p id="run-status" class="mt-3 min-h-5 text-xs text-slate-500" role="status" aria-live="polite">選擇演算法與起點，準備開始走訪。</p>
+    </section>
+
+    <section aria-label="圖形視覺化" class="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+      <div class="flex flex-col gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div>
+          <h2 class="font-semibold text-slate-800">景點關係圖</h2>
+          <p class="mt-0.5 text-xs text-slate-400">點線代表景點之間可直接抵達的路線</p>
+        </div>
+        <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
+          <span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-full border-2 border-slate-300 bg-white"></span>未發現</span>
+          <span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-full border-2 border-orange-500 bg-orange-50"></span>待辦中</span>
+          <span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-full border-2 border-amber-600 bg-amber-400"></span>處理中</span>
+          <span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-full border-2 border-green-500 bg-green-50"></span>已完成</span>
+        </div>
+      </div>
+      <div class="bg-slate-50/80 px-2 py-3 sm:px-6 sm:py-5">
+        <svg id="graph" class="mx-auto block h-auto w-full max-w-4xl" viewBox="0 0 700 470" role="img" aria-label="包含 A 到 F 六個景點的無向圖">
+          <g aria-hidden="true">
+            <line class="graph-edge" x1="125" y1="105" x2="330" y2="82"/>
+            <line class="graph-edge" x1="125" y1="105" x2="265" y2="235"/>
+            <line class="graph-edge" x1="330" y1="82" x2="265" y2="235"/>
+            <line class="graph-edge" x1="330" y1="82" x2="485" y2="205"/>
+            <line class="graph-edge" x1="265" y1="235" x2="485" y2="205"/>
+            <line class="graph-edge" x1="265" y1="235" x2="555" y2="350"/>
+            <line class="graph-edge" x1="485" y1="205" x2="555" y2="350"/>
+            <line class="graph-edge" x1="485" y1="205" x2="430" y2="405"/>
+            <line class="graph-edge" x1="555" y1="350" x2="430" y2="405"/>
+          </g>
+          <g class="graph-node" data-node="A">
+            <circle class="node-circle" cx="125" cy="105" r="27"/>
+            <text class="node-code" x="125" y="105">A</text>
+            <text class="node-label" x="125" y="151">捷運站</text>
+            <text class="node-label-en" x="125" y="167">Station</text>
+          </g>
+          <g class="graph-node" data-node="B">
+            <circle class="node-circle" cx="330" cy="82" r="27"/>
+            <text class="node-code" x="330" y="82">B</text>
+            <text class="node-label" x="330" y="128">博物館</text>
+            <text class="node-label-en" x="330" y="144">Museum</text>
+          </g>
+          <g class="graph-node" data-node="C">
+            <circle class="node-circle" cx="265" cy="235" r="27"/>
+            <text class="node-code" x="265" y="235">C</text>
+            <text class="node-label" x="265" y="281">夜市</text>
+            <text class="node-label-en" x="265" y="297">Night Market</text>
+          </g>
+          <g class="graph-node" data-node="D">
+            <circle class="node-circle" cx="485" cy="205" r="27"/>
+            <text class="node-code" x="485" y="205">D</text>
+            <text class="node-label" x="485" y="251">公園</text>
+            <text class="node-label-en" x="485" y="267">Park</text>
+          </g>
+          <g class="graph-node" data-node="E">
+            <circle class="node-circle" cx="555" cy="350" r="27"/>
+            <text class="node-code" x="555" y="350">E</text>
+            <text class="node-label" x="555" y="396">購物中心</text>
+            <text class="node-label-en" x="555" y="412">Mall</text>
+          </g>
+          <g class="graph-node" data-node="F">
+            <circle class="node-circle" cx="430" cy="405" r="27"/>
+            <text class="node-code" x="430" y="405">F</text>
+            <text class="node-label" x="430" y="451">觀景台</text>
+            <text class="node-label-en" x="430" y="466">Observatory</text>
+          </g>
+        </svg>
+      </div>
+    </section>
+
+    <section aria-label="走訪狀態" class="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <article class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 id="pending-title" class="text-xs font-bold tracking-widest text-slate-500">QUEUE <span class="font-medium tracking-normal text-slate-400">/ 待辦清單</span></h2>
+            <p id="pending-subtitle" class="mt-1 text-xs text-slate-400">先進先出 · Front → Rear</p>
+          </div>
+          <span id="pending-count" class="rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-500">0</span>
+        </div>
+        <div id="pending-list" class="mt-4 flex min-h-10 flex-wrap items-center gap-2" aria-live="polite">
+          <span class="text-sm text-slate-300">尚無待辦節點</span>
+        </div>
+        <p id="stack-hint" class="mt-3 hidden text-[11px] text-slate-400">堆疊頂端顯示於最右側</p>
+      </article>
+
+      <article class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-xs font-bold tracking-widest text-slate-500">VISITED <span class="font-medium tracking-normal text-slate-400">/ 標記清單</span></h2>
+            <p class="mt-1 text-xs text-slate-400">已發現的節點</p>
+          </div>
+          <span id="visited-count" class="rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-500">0 / 6</span>
+        </div>
+        <div id="visited-list" class="mt-4 flex flex-wrap gap-2" aria-live="polite"></div>
+      </article>
+
+      <article class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-xs font-bold tracking-widest text-slate-500">ORDER <span class="font-medium tracking-normal text-slate-400">/ 走訪順序</span></h2>
+            <p class="mt-1 text-xs text-slate-400">節點完成處理的順序</p>
+          </div>
+          <span id="order-count" class="rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-500">0</span>
+        </div>
+        <div id="order-list" class="mt-4 flex min-h-10 flex-wrap items-center gap-2" aria-live="polite">
+          <span class="text-sm text-slate-300">尚未開始</span>
+        </div>
+      </article>
+    </section>
+
+    <footer class="mt-6 flex flex-col gap-1 border-t border-slate-200/80 pt-4 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+      <span>Adjacency List · 每個步驟間隔 800 ms</span>
+      <span>BFS 使用 Queue <span class="mx-1 text-slate-300">|</span> DFS 使用 Stack</span>
+    </footer>
+  </main>
+
+  <script>
+    const adjacencyList = {
+      A: ["B", "C"],
+      B: ["A", "C", "D"],
+      C: ["A", "B", "D", "E"],
+      D: ["B", "C", "E", "F"],
+      E: ["C", "D", "F"],
+      F: ["D", "E"]
+    };
+    const nodes = Object.keys(adjacencyList);
+    const delayMs = 800;
+    const algorithmSelect = document.querySelector("#algorithm");
+    const startSelect = document.querySelector("#start-node");
+    const runButton = document.querySelector("#run-button");
+    const resetButton = document.querySelector("#reset-button");
+    const status = document.querySelector("#run-status");
+    const pendingTitle = document.querySelector("#pending-title");
+    const pendingSubtitle = document.querySelector("#pending-subtitle");
+    const pendingCount = document.querySelector("#pending-count");
+    const pendingList = document.querySelector("#pending-list");
+    const stackHint = document.querySelector("#stack-hint");
+    const visitedCount = document.querySelector("#visited-count");
+    const visitedList = document.querySelector("#visited-list");
+    const orderCount = document.querySelector("#order-count");
+    const orderList = document.querySelector("#order-list");
+
+    let discovered = new Set();
+    let order = [];
+    let currentWorklist = [];
+    let activeNode = null;
+    let finishedNodes = new Set();
+    let runId = 0;
+    let delayTimer = null;
+
+    function render() {
+      document.querySelectorAll(".graph-node").forEach((element) => {
+        const node = element.dataset.node;
+        element.classList.toggle("active", activeNode === node);
+        element.classList.toggle("finished", finishedNodes.has(node));
+        element.classList.toggle("discovered", discovered.has(node) && activeNode !== node && !finishedNodes.has(node));
+      });
+
+      const isDfs = algorithmSelect.value === "dfs";
+      pendingTitle.innerHTML = `${isDfs ? "STACK" : "QUEUE"} <span class="font-medium tracking-normal text-slate-400">/ 待辦清單</span>`;
+      pendingSubtitle.textContent = isDfs ? "後進先出 · Top 在最右側" : "先進先出 · Front → Rear";
+      stackHint.classList.toggle("hidden", !isDfs);
+      pendingCount.textContent = String(currentWorklist.length);
+      pendingList.replaceChildren();
+      if (currentWorklist.length === 0) {
+        const empty = document.createElement("span");
+        empty.className = "text-sm text-slate-300";
+        empty.textContent = "尚無待辦節點";
+        pendingList.append(empty);
+      } else {
+        currentWorklist.forEach((node, index) => {
+          const chip = document.createElement("span");
+          chip.className = "inline-flex h-9 min-w-9 items-center justify-center rounded-lg border border-orange-200 bg-orange-50 px-2.5 text-sm font-bold text-orange-700";
+          chip.textContent = node;
+          if (!isDfs && index === 0) chip.title = "下一個處理（Front）";
+          if (isDfs && index === currentWorklist.length - 1) chip.title = "下一個處理（Stack top）";
+          pendingList.append(chip);
+          if (!isDfs && index < currentWorklist.length - 1) {
+            const separator = document.createElement("span");
+            separator.className = "text-slate-300";
+            separator.textContent = "›";
+            pendingList.append(separator);
+          }
+        });
+      }
+
+      visitedCount.textContent = `${discovered.size} / ${nodes.length}`;
+      visitedList.replaceChildren();
+      nodes.forEach((node) => {
+        const chip = document.createElement("span");
+        const wasDiscovered = discovered.has(node);
+        chip.className = wasDiscovered
+          ? "inline-flex h-9 min-w-9 items-center justify-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2 text-sm font-semibold text-green-700"
+          : "inline-flex h-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm font-semibold text-slate-400";
+        chip.textContent = wasDiscovered ? `${node} ✓` : node;
+        visitedList.append(chip);
+      });
+
+      orderCount.textContent = String(order.length);
+      orderList.replaceChildren();
+      if (order.length === 0) {
+        const empty = document.createElement("span");
+        empty.className = "text-sm text-slate-300";
+        empty.textContent = "尚未開始";
+        orderList.append(empty);
+      } else {
+        order.forEach((node, index) => {
+          const chip = document.createElement("span");
+          chip.className = "inline-flex h-9 min-w-9 items-center justify-center rounded-lg bg-blue-50 px-2.5 text-sm font-bold text-blue-700";
+          chip.textContent = node;
+          orderList.append(chip);
+          if (index < order.length - 1) {
+            const separator = document.createElement("span");
+            separator.className = "text-slate-300";
+            separator.textContent = "→";
+            orderList.append(separator);
+          }
+        });
+      }
+    }
+
+    function resetState(message = "選擇演算法與起點，準備開始走訪。") {
+      runId += 1;
+      if (delayTimer !== null) {
+        clearTimeout(delayTimer);
+        delayTimer = null;
+      }
+      discovered = new Set();
+      order = [];
+      currentWorklist = [];
+      activeNode = null;
+      finishedNodes = new Set();
+      runButton.disabled = false;
+      algorithmSelect.disabled = false;
+      startSelect.disabled = false;
+      status.textContent = message;
+      render();
+    }
+
+    function waitForNextStep(id) {
+      return new Promise((resolve) => {
+        delayTimer = window.setTimeout(() => {
+          delayTimer = null;
+          resolve(id === runId);
+        }, delayMs);
+      });
+    }
+
+    async function pause(id) {
+      render();
+      return waitForNextStep(id);
+    }
+
+    async function runTraversal() {
+      resetState("正在準備走訪…");
+      const id = runId;
+      const algorithm = algorithmSelect.value;
+      const start = startSelect.value;
+      const isDfs = algorithm === "dfs";
+      const name = isDfs ? "DFS" : "BFS";
+      runButton.disabled = true;
+      algorithmSelect.disabled = true;
+      startSelect.disabled = true;
+      status.textContent = `${name} 從 ${start} 開始走訪…`;
+
+      try {
+        discovered.add(start);
+        currentWorklist.push(start);
+        if (!(await pause(id))) return;
+
+        while (currentWorklist.length > 0) {
+          if (id !== runId) return;
+          const current = isDfs ? currentWorklist.pop() : currentWorklist.shift();
+          activeNode = current;
+          order.push(current);
+          status.textContent = `正在處理節點 ${current} · 走訪順序：${order.join(" → ")}`;
+          if (!(await pause(id))) return;
+
+          const neighbors = isDfs ? [...adjacencyList[current]].reverse() : adjacencyList[current];
+          for (const neighbor of neighbors) {
+            if (discovered.has(neighbor)) continue;
+            discovered.add(neighbor);
+            currentWorklist.push(neighbor);
+            status.textContent = `從 ${current} 發現相鄰節點 ${neighbor}`;
+            if (!(await pause(id))) return;
+          }
+
+          finishedNodes.add(current);
+          activeNode = null;
+          status.textContent = `節點 ${current} 處理完畢`;
+          if (!(await pause(id))) return;
+        }
+
+        status.textContent = `${name} 走訪完成：${order.join(" → ")}`;
+      } catch (error) {
+        console.error("Graph traversal failed:", error);
+        status.textContent = `走訪時發生錯誤：${error instanceof Error ? error.message : String(error)}`;
+      } finally {
+        if (id === runId) {
+          runButton.disabled = false;
+          algorithmSelect.disabled = false;
+          startSelect.disabled = false;
+          render();
+        }
+      }
+    }
+
+    runButton.addEventListener("click", runTraversal);
+    resetButton.addEventListener("click", () => resetState());
+    algorithmSelect.addEventListener("change", render);
+    render();
+  </script>
+</body>
+</html>
